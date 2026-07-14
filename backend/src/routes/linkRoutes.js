@@ -1,0 +1,12 @@
+const express = require('express');
+const protect = require('../middlewares/protect');
+const linkController = require('../controllers/linkController');
+
+const router = express.Router();
+
+router.post('/', protect, linkController.createLink);
+router.get('/', protect, linkController.getMyLinks);
+router.put('/:id', protect, linkController.updateLink);
+router.delete('/:id', protect, linkController.deleteLink);
+
+module.exports = router;

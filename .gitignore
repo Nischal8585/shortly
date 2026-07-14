@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+/node_modules
+/*/node_modules
+
+# Production/Build outputs
+dist/
+build/
+out/
+
+# Environment files and credentials
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Editor/IDE configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# System-specific files (macOS/Windows)
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Diagnostic and testing reports
+coverage/
+.nyc_output/
+.nodemon/
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+
+# Vite
+frontend/dist/
+
+# Backend uploads (future)
+uploads/
