@@ -1,5 +1,9 @@
 const linkService = require('../services/linkService');
 
+/**
+ * POST /api/links
+ * Creates a shortened link.
+ */
 const createLink = async (req, res, next) => {
   try {
     const { originalUrl, customAlias } = req.body;
@@ -17,7 +21,11 @@ const createLink = async (req, res, next) => {
   }
 };
 
-const getMyLinks = async (req, res, next) => {
+/**
+ * GET /api/links
+ * Retrieves all links owned by the authenticated user.
+ */
+const getUserLinks = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const links = await linkService.getUserLinks(userId);
@@ -31,13 +39,17 @@ const getMyLinks = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/links/:id
+ * Modifies an existing link's settings (URL, isActive status, custom alias).
+ */
 const updateLink = async (req, res, next) => {
   try {
     const linkId = req.params.id;
     const updateData = req.body;
     const userId = req.user._id;
 
-    const link = await linkService.updateUserLink(userId, linkId, updateData);
+    const link = await linkService.updateLink(userId, linkId, updateData);
 
     return res.status(200).json({
       success: true,
@@ -49,12 +61,16 @@ const updateLink = async (req, res, next) => {
   }
 };
 
+/**
+ * DELETE /api/links/:id
+ * Soft deletes a link, disabling redirection routes.
+ */
 const deleteLink = async (req, res, next) => {
   try {
     const linkId = req.params.id;
     const userId = req.user._id;
 
-    await linkService.deleteUserLink(userId, linkId);
+    await linkService.deleteLink(userId, linkId);
 
     return res.status(200).json({
       success: true,
@@ -65,10 +81,14 @@ const deleteLink = async (req, res, next) => {
   }
 };
 
-const redirectLink = async (req, res, next) => {
+/**
+ * GET /:shortCode
+ * Resolves a short slug and redirects the visitor to the destination.
+ */
+const redirectToOriginalUrl = async (req, res, next) => {
   try {
     const shortCode = req.params.shortCode;
-    const originalUrl = await linkService.redirectToOriginalUrl(shortCode);
+    const originalUrl = await linkService.resolveShortCode(shortCode);
 
     return res.redirect(302, originalUrl);
   } catch (error) {
@@ -78,8 +98,8 @@ const redirectLink = async (req, res, next) => {
 
 module.exports = {
   createLink,
-  getMyLinks,
+  getUserLinks,
   updateLink,
   deleteLink,
-  redirectLink
+  redirectToOriginalUrl
 };

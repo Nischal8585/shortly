@@ -1,0 +1,11 @@
+/* ============================================================
+   auth-pages.css — Shared styles for Login & Register pages
+   ============================================================ */
+
+/* -- Field group -------------------------------------------- */
+/* Spacing is owned here, not by auth-card__body gap,
+   to give each field group independent control. */
+.auth-field-group {
+  display: flex;
+  flex-direction: column;
+}

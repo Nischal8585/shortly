@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const LinkSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'User reference is required'],
+    index: true
+  },
   originalUrl: {
     type: String,
     required: [true, 'Original URL is required'],
@@ -21,11 +27,6 @@ const LinkSchema = new mongoose.Schema({
     unique: true,
     sparse: true
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'User reference is required']
-  },
   clicks: {
     type: Number,
     default: 0
@@ -41,5 +42,8 @@ const LinkSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Explicit indexes to support dashboard sorting and pagination
+LinkSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Link', LinkSchema);

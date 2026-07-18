@@ -28,7 +28,7 @@ app.get('/health', (req, res) => {
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/links', linkRoutes);
-app.use('/r', redirectRoutes);
+app.use('/', redirectRoutes);
 
 // Global 404 handler
 app.use((req, res, next) => {

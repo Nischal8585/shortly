@@ -2,11 +2,11 @@
 
 > **Project:** Shortly
 >
-> **Version:** 0.1.0
+> **Version:** 0.2.0
 >
 > **Status:** Active Development
 >
-> **Current Milestone:** Authentication (Milestone 2)
+> **Current Milestone:** Link Management (Milestone 3)
 >
 > **Document Purpose:** This document is the official engineering handbook and single source of truth for the Shortly project. Every architectural decision, implementation guideline, development milestone, and future enhancement must be reflected here. Any future ChatGPT session or developer joining the project should read this document before making changes.
 
@@ -302,31 +302,21 @@ If a feature increases complexity without significantly improving interview read
 
 Project Version
 
-**0.1.0**
+**0.2.0**
 
 Development Phase
 
-**Milestone 2 — Authentication**
+**Milestone 3 — Link Management**
 
 Overall Progress
 
-- ✅ Project Foundation
-- ✅ User Model
-- ✅ Repository Layer
-- ✅ Service Layer
-- ✅ Controller Layer
-- ✅ Authentication Routes
-- ✅ Global Error Middleware
+- ✅ Project Foundation (Phase 1)
+- ✅ User Authentication Module (Phase 2 & 4)
+- ✅ Link Management Architecture & Database Design (Sprint 5A.1 - Reviewed & Frozen)
 
 Current Task
 
-Continue backend authentication by implementing:
-
-- JWT Authentication Middleware
-- Connect app.js
-- Connect server.js
-- MongoDB Connection
-- Authentication Testing
+Begin Sprint 5B backend implementation — integrate controller routes, services, schemas, click logging, and unit/integration tests.
 
 ---
 
@@ -875,15 +865,53 @@ No layer should skip another layer.
 
 ---
 
+# 17. Authentication Architecture
+
+## Overview
+Shortly implements a secure, token-based authentication system utilizing JSON Web Tokens (JWT). The system decouples credential verification and route routing from user state management, ensuring a highly maintainable full-stack authentication flow.
+
+## AuthContext Responsibilities
+`AuthContext` provides a centralized provider managing the following state properties and functions:
+- `authLoading` (boolean): Indicates if session restoration checks are active.
+- `isAuthenticated` (boolean): Confirms presence of a valid session token.
+- `user` (object | null): Contains user profile data (null until the backend profile retrieval route is implemented).
+- `login(email, password)`: Submits credentials, saves the token, and populates the user object in state memory.
+- `register(fullName, email, password)`: Calls user registration, returning response details.
+- `logout()`: Clears token memory, resets user state, and redirects to home.
+
+## Session Restoration Strategy
+Session persistence operates stateless client-side:
+1. **Startup Check**: On app boot, `AuthContext` checks `localStorage` for `shortly_auth_token`.
+2. **State Sync**: If the token exists, `isAuthenticated` is initialized to `true` and `user = null`.
+3. **GET /api/auth/me Integration**: This check serves as the hook for future integration to fetch fresh user profile data from the backend using the restored token.
+
+## Route Protection Flow
+Route guards (`ProtectedRoute`) enforce authorization boundaries:
+- If `authLoading` is `true`, a loading layout is rendered to prevent flash redirections.
+- If `isAuthenticated` is `false`, guests are redirected to `/login`.
+- If `isAuthenticated` is `true`, child components are rendered.
+
+## Axios API Layer
+Axios requests are managed through a single configured instance:
+- **Request Interceptor**: Automatically attaches the JWT token (`Authorization: Bearer <token>`) from `localStorage` to all outgoing requests.
+- **Response Interceptor**: Intercepts `401 Unauthorized` errors to automatically trigger local token cleanup and session reset.
+
+## Reusable EmptyState Component
+To maintain visual consistency and avoid fake data, Shortly uses a reusable `EmptyState` component. It renders a clean solid-bordered card with white background surface, centered iconography, descriptive typography, and optional CTA button handlers when list datasets (links, analytics, profiles) are empty.
+
+---
+
 # End of Part 2
 
 | Feature | Status | Reviewed | Tested |
 |---------|--------|----------|---------|
 | Project Foundation | ✅ | ✅ | ✅ |
-| User Model | ✅ | ✅ | ⬜ |
-| Repository | ✅ | ✅ | ⬜ |
-| Auth Service | ✅ | ✅ | ⬜ |
-| Auth Controller | ✅ | ✅ | ⬜ |
-| Auth Routes | ✅ | ✅ | ⬜ |
-| Error Middleware | ✅ | ✅ | ⬜ |
-| JWT Middleware | ⬜ | ⬜ | ⬜ |
+| User Model | ✅ | ✅ | ✅ |
+| Repository | ✅ | ✅ | ✅ |
+| Auth Service | ✅ | ✅ | ✅ |
+| Auth Controller | ✅ | ✅ | ✅ |
+| Auth Routes | ✅ | ✅ | ✅ |
+| Error Middleware | ✅ | ✅ | ✅ |
+| JWT Middleware | ✅ | ✅ | ✅ |
+| Frontend Auth Integration | ✅ | ✅ | ✅ |
+

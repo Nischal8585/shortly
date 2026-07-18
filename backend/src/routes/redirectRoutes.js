@@ -3,6 +3,6 @@ const linkController = require('../controllers/linkController');
 
 const router = express.Router();
 
-router.get('/:shortCode', linkController.redirectLink);
+router.get('/:shortCode', linkController.redirectToOriginalUrl);
 
 module.exports = router;
