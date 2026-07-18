@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/layout/Navbar/Navbar';
 import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/ui/EmptyState/EmptyState';
+import linkService from '../services/linkService';
+import './DashboardPage.css';
 
 const LinkIcon = (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -11,10 +13,80 @@ const LinkIcon = (
 );
 
 /**
- * DashboardPage — Renders the link shortening form and link listing placeholders.
+ * DashboardPage — Renders user metrics, shortener form, and link table fetched from linkService.
  */
 function DashboardPage() {
   const { user } = useAuth();
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Shortener form state
+  const [originalUrl, setOriginalUrl] = useState('');
+  const [customAlias, setCustomAlias] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [formSuccess, setFormSuccess] = useState(null);
+
+  const fetchLinks = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await linkService.getLinks();
+      const linksData = response.data || [];
+      setLinks(linksData);
+    } catch (err) {
+      setError(err.message || 'Failed to retrieve links. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLinks();
+  }, []);
+
+  // Compute metrics
+  const totalLinks = links.length;
+  const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0);
+
+  // Formulate absolute redirect url pointing to backend redirection server
+  const getShortUrl = (shortCode) => {
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const redirectBase = apiBase.replace('/api', '');
+    return `${redirectBase}/${shortCode}`;
+  };
+
+  // Form submission handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+    setSubmitting(true);
+
+    try {
+      // Pass clean trimmed parameters
+      await linkService.createLink({
+        originalUrl: originalUrl.trim(),
+        customAlias: customAlias.trim() || undefined
+      });
+
+      // Clear input fields
+      setOriginalUrl('');
+      setCustomAlias('');
+      setFormSuccess('Short URL generated successfully.');
+
+      // Auto dismiss success toast
+      setTimeout(() => setFormSuccess(null), 5000);
+
+      // Re-fetch listing data
+      await fetchLinks();
+    } catch (err) {
+      setFormError(err.message || 'An error occurred during link generation.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="dashboard-page">
@@ -40,7 +112,20 @@ function DashboardPage() {
 
           <div className="card">
             <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>Shorten a link</h2>
-            <form onSubmit={(e) => e.preventDefault()}>
+            
+            {formSuccess && (
+              <div className="form-alert form-alert-success">
+                <span>{formSuccess}</span>
+              </div>
+            )}
+
+            {formError && (
+              <div className="form-alert form-alert-error">
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label className="form-label" htmlFor="url-input">
                   Destination URL
@@ -50,7 +135,10 @@ function DashboardPage() {
                   id="url-input"
                   type="url"
                   placeholder="https://example.com/very-long-link-path"
-                  disabled
+                  value={originalUrl}
+                  onChange={(e) => setOriginalUrl(e.target.value)}
+                  disabled={submitting}
+                  required
                 />
               </div>
               <div className="form-group">
@@ -62,42 +150,113 @@ function DashboardPage() {
                   id="custom-alias"
                   type="text"
                   placeholder="custom-short-slug"
-                  disabled
+                  value={customAlias}
+                  onChange={(e) => setCustomAlias(e.target.value)}
+                  disabled={submitting}
                 />
               </div>
               <button
                 className="btn btn-primary"
-                type="button"
+                type="submit"
                 style={{ width: '100%' }}
-                disabled
+                disabled={submitting}
               >
-                Shorten
+                {submitting ? 'Generating...' : 'Shorten'}
               </button>
-              <p
-                style={{
-                  fontSize: '0.8rem',
-                  color: 'var(--color-text-secondary)',
-                  marginTop: '0.8rem',
-                  textAlign: 'center',
-                }}
-              >
-                Note: Backend integration and shortening logic will be unlocked in later phases.
-              </p>
             </form>
           </div>
         </section>
 
-        {/* List & Analytics Overview Container */}
+        {/* Dynamic List Section */}
         <section style={{ marginBottom: '4rem' }}>
-          <EmptyState
-            icon={LinkIcon}
-            title="You haven't created any short links yet."
-            description="Create your first link using the form above to start redirecting traffic and tracking insights."
-            action={{
-              label: "Create your first link",
-              onClick: () => document.getElementById('url-input')?.focus()
-            }}
-          />
+          {error && (
+            <div className="error-banner">
+              <span>Error: {error}</span>
+              <button onClick={fetchLinks}>Try Again</button>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="skeleton-loader">
+              <div className="skeleton-row" style={{ height: '80px', marginBottom: '1.5rem' }}></div>
+              <div className="skeleton-row"></div>
+              <div className="skeleton-row"></div>
+              <div className="skeleton-row"></div>
+            </div>
+          ) : links.length === 0 ? (
+            <EmptyState
+              icon={LinkIcon}
+              title="You haven't created any short links yet."
+              description="Create your first link using the form above to start redirecting traffic and tracking insights."
+              action={{
+                label: "Create your first link",
+                onClick: () => document.getElementById('url-input')?.focus()
+              }}
+            />
+          ) : (
+            <>
+              {/* Metrics Overview */}
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <span className="metric-value">{totalLinks}</span>
+                  <span className="metric-label">Total Links</span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-value">{totalClicks}</span>
+                  <span className="metric-label">Total Clicks</span>
+                </div>
+              </div>
+
+              {/* Links Table */}
+              <div className="table-container">
+                <table className="links-table">
+                  <thead>
+                    <tr>
+                      <th>Original URL</th>
+                      <th>Short URL</th>
+                      <th>Clicks</th>
+                      <th>Created Date</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {links.map((link) => (
+                      <tr key={link._id}>
+                        <td>
+                          <div className="url-cell" title={link.originalUrl}>
+                            {link.originalUrl}
+                          </div>
+                        </td>
+                        <td>
+                          <a
+                            className="short-url-link"
+                            href={getShortUrl(link.shortCode)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
+                          </a>
+                        </td>
+                        <td>{link.clicks || 0}</td>
+                        <td>
+                          {new Date(link.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </td>
+                        <td>
+                          <span className={`status-badge ${link.isActive ? 'active' : 'inactive'}`}>
+                            {link.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </section>
       </main>
     </div>

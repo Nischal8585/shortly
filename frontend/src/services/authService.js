@@ -57,6 +57,13 @@ export const authService = {
       throw normalizeError(error);
     }
   },
+
+  /**
+   * Logs out the user by clearing the auth token.
+   */
+  logout() {
+    localStorage.removeItem('shortly_auth_token');
+  }
 };
 
 export default authService;

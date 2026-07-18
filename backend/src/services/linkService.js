@@ -235,11 +235,8 @@ const resolveShortCode = async (shortCode) => {
     throw error;
   }
 
-  // Log redirect metrics asynchronously and parallelly
-  await Promise.all([
-    linkRepository.incrementClickCount(link._id),
-    linkRepository.updateLastClicked(link._id)
-  ]);
+  // Record click (single repository operation updating both clicks and timestamp)
+  await linkRepository.incrementClickCount(link._id);
 
   return link.originalUrl;
 };

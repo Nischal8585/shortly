@@ -1,0 +1,193 @@
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.metric-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  transition: border-color var(--transition-fast);
+}
+
+.metric-card:hover {
+  border-color: var(--color-border-hover);
+}
+
+.metric-value {
+  font-size: 2.2rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-accent);
+  line-height: 1;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing-lg);
+}
+
+.links-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.links-table th {
+  background-color: var(--color-bg);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.05em;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.links-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.links-table tr:last-child td {
+  border-bottom: none;
+}
+
+.links-table tr:hover td {
+  background-color: #fbfaf8;
+}
+
+.url-cell {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.short-url-link {
+  color: var(--color-accent);
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.short-url-link:hover {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.status-badge.active {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.status-badge.inactive {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.error-banner {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.error-banner button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Dedicated Form Alert Banners */
+.form-alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.form-alert-success {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.form-alert-error {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+/* Pulse Animation Skeletons */
+.skeleton-loader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-md);
+}
+
+.skeleton-row {
+  height: 48px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: pulse-loading-gradient 1.5s infinite;
+  border-radius: var(--border-radius);
+}
+
+@keyframes pulse-loading-gradient {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

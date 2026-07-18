@@ -51,10 +51,17 @@ const softDelete = async (id) => {
 };
 
 /**
- * Increments the click tracker tally for a link by 1.
+ * Increments the click tracker tally for a link by 1 and updates lastClickedAt.
  */
 const incrementClickCount = async (id) => {
-  return Link.findByIdAndUpdate(id, { $inc: { clicks: 1 } }, { new: true }).exec();
+  return Link.findByIdAndUpdate(
+    id,
+    {
+      $inc: { clicks: 1 },
+      $set: { lastClickedAt: new Date() }
+    },
+    { new: true }
+  ).exec();
 };
 
 /**
