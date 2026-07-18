@@ -3,6 +3,7 @@ import Navbar from '../components/layout/Navbar/Navbar';
 import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/ui/EmptyState/EmptyState';
 import linkService from '../services/linkService';
+import { getShortUrl } from '../utils/linkUtils';
 import './DashboardPage.css';
 
 const LinkIcon = (
@@ -28,6 +29,10 @@ function DashboardPage() {
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(null);
 
+  // Copy tracking states
+  const [copiedLinkId, setCopiedLinkId] = useState(null);
+  const [copyErrorLinkId, setCopyErrorLinkId] = useState(null);
+
   const fetchLinks = async () => {
     setLoading(true);
     setError(null);
@@ -50,11 +55,19 @@ function DashboardPage() {
   const totalLinks = links.length;
   const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0);
 
-  // Formulate absolute redirect url pointing to backend redirection server
-  const getShortUrl = (shortCode) => {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const redirectBase = apiBase.replace('/api', '');
-    return `${redirectBase}/${shortCode}`;
+  // Copy action handler
+  const handleCopy = async (link) => {
+    const fullUrl = getShortUrl(link.shortCode);
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedLinkId(link._id);
+      setCopyErrorLinkId(null);
+      setTimeout(() => setCopiedLinkId(null), 2500);
+    } catch (err) {
+      setCopyErrorLinkId(link._id);
+      setCopiedLinkId(null);
+      setTimeout(() => setCopyErrorLinkId(null), 2500);
+    }
   };
 
   // Form submission handler
@@ -228,14 +241,33 @@ function DashboardPage() {
                           </div>
                         </td>
                         <td>
-                          <a
-                            className="short-url-link"
-                            href={getShortUrl(link.shortCode)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
-                          </a>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <a
+                              className="short-url-link"
+                              href={getShortUrl(link.shortCode)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
+                            </a>
+                            <button
+                              className={`btn-copy ${copiedLinkId === link._id ? 'copied' : ''}`}
+                              onClick={() => handleCopy(link)}
+                              aria-label="Copy short URL to clipboard"
+                              title={copiedLinkId === link._id ? "Copied!" : "Copy URL"}
+                            >
+                              {copiedLinkId === link._id ? (
+                                <span className="copy-feedback-text">✓ Copied</span>
+                              ) : copyErrorLinkId === link._id ? (
+                                <span className="copy-feedback-error">Failed</span>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                         </td>
                         <td>{link.clicks || 0}</td>
                         <td>

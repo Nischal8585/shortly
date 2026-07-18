@@ -167,6 +167,50 @@
   color: #991b1b;
 }
 
+/* Copy Button & Feedback Styling */
+.btn-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  height: 28px;
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.btn-copy:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+  background-color: var(--color-bg);
+}
+
+.btn-copy:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.btn-copy.copied {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.copy-feedback-text {
+  font-weight: 600;
+}
+
+.copy-feedback-error {
+  color: #991b1b;
+}
+
 /* Pulse Animation Skeletons */
 .skeleton-loader {
   display: flex;
