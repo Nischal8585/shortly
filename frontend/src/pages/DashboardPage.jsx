@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/layout/Navbar/Navbar';
 import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/ui/EmptyState/EmptyState';
+import Modal from "../components/ui/Modal";
 import linkService from '../services/linkService';
 import { getShortUrl } from '../utils/linkUtils';
 import './DashboardPage.css';
@@ -33,6 +34,18 @@ function DashboardPage() {
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [copyErrorLinkId, setCopyErrorLinkId] = useState(null);
 
+  // Edit tracking states
+  const [editingLinkId, setEditingLinkId] = useState(null);
+  const [editAliasValue, setEditAliasValue] = useState('');
+  const [savingLinkId, setSavingLinkId] = useState(null);
+  const [editError, setEditError] = useState(null);
+  const [editSuccessLinkId, setEditSuccessLinkId] = useState(null);
+
+  // Delete tracking states
+  const [deletingLinkId, setDeletingLinkId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [linkToDelete, setLinkToDelete] = useState(null);
+
   const fetchLinks = async () => {
     setLoading(true);
     setError(null);
@@ -50,6 +63,22 @@ function DashboardPage() {
   useEffect(() => {
     fetchLinks();
   }, []);
+  useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      fetchLinks();
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    document.removeEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+  };
+}, []);
 
   // Compute metrics
   const totalLinks = links.length;
@@ -68,6 +97,63 @@ function DashboardPage() {
       setCopiedLinkId(null);
       setTimeout(() => setCopyErrorLinkId(null), 2500);
     }
+  };
+
+  // Edit action handlers
+  const handleStartEdit = (link) => {
+    setEditingLinkId(link._id);
+    setEditAliasValue(link.customAlias || '');
+    setEditError(null);
+    setEditSuccessLinkId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLinkId(null);
+    setEditAliasValue('');
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async (link) => {
+    setSavingLinkId(link._id);
+    setEditError(null);
+    try {
+      await linkService.updateLink(link._id, { customAlias: editAliasValue.trim() || undefined });
+      setEditSuccessLinkId(link._id);
+      setEditingLinkId(null);
+      setEditAliasValue('');
+      setTimeout(() => setEditSuccessLinkId(null), 3000);
+      await fetchLinks();
+    } catch (err) {
+      setEditError(err.message || 'Failed to update alias');
+    } finally {
+      setSavingLinkId(null);
+    }
+  };
+
+  // Delete action handlers
+  const handleDeleteClick = (link) => {
+    setLinkToDelete(link);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!linkToDelete) return;
+    setDeletingLinkId(linkToDelete._id);
+    try {
+      await linkService.deleteLink(linkToDelete._id);
+      setShowDeleteModal(false);
+      setLinkToDelete(null);
+      await fetchLinks();
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      setDeletingLinkId(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setLinkToDelete(null);
   };
 
   // Form submission handler
@@ -230,6 +316,7 @@ function DashboardPage() {
                       <th>Clicks</th>
                       <th>Created Date</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -241,33 +328,14 @@ function DashboardPage() {
                           </div>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <a
-                              className="short-url-link"
-                              href={getShortUrl(link.shortCode)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
-                            </a>
-                            <button
-                              className={`btn-copy ${copiedLinkId === link._id ? 'copied' : ''}`}
-                              onClick={() => handleCopy(link)}
-                              aria-label="Copy short URL to clipboard"
-                              title={copiedLinkId === link._id ? "Copied!" : "Copy URL"}
-                            >
-                              {copiedLinkId === link._id ? (
-                                <span className="copy-feedback-text">✓ Copied</span>
-                              ) : copyErrorLinkId === link._id ? (
-                                <span className="copy-feedback-error">Failed</span>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                              )}
-                            </button>
-                          </div>
+                          <a
+                            className="short-url-link"
+                            href={getShortUrl(link.shortCode)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
+                          </a>
                         </td>
                         <td>{link.clicks || 0}</td>
                         <td>
@@ -282,6 +350,63 @@ function DashboardPage() {
                             {link.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <button
+                              className={`btn-copy ${copiedLinkId === link._id ? 'copied' : ''}`}
+                              onClick={() => handleCopy(link)}
+                              aria-label="Copy short URL to clipboard"
+                              title={copiedLinkId === link._id ? "Copied!" : "Copy URL"}
+                            >
+                              {copiedLinkId === link._id ? (
+                                <span className="copy-feedback-text">✓</span>
+                              ) : copyErrorLinkId === link._id ? (
+                                <span className="copy-feedback-error">✗</span>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                              )}
+                            </button>
+                            <button
+                              className="btn-copy"
+                              onClick={() => handleStartEdit(link)}
+                              aria-label="Edit custom alias"
+                              title="Edit custom alias"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                              </svg>
+                            </button>
+                            <button
+                              className="btn-copy"
+                              onClick={() => window.location.href = `/analytics/${link._id}`}
+                              aria-label="View analytics"
+                              title="View analytics"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="20" x2="18" y2="10" />
+                                <line x1="12" y1="20" x2="12" y2="4" />
+                                <line x1="6" y1="20" x2="6" y2="14" />
+                              </svg>
+                            </button>
+                            <button
+                              className="btn-copy"
+                              onClick={() => handleDeleteClick(link)}
+                              disabled={deletingLinkId === link._id}
+                              aria-label="Delete link"
+                              title="Delete link"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -291,6 +416,79 @@ function DashboardPage() {
           )}
         </section>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={handleDeleteCancel}
+        title="Delete Link"
+        size="small"
+      >
+        <p style={{ marginBottom: '1.5rem' }}>
+          Are you sure you want to delete this link? This action cannot be undone.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleDeleteCancel}
+            disabled={deletingLinkId !== null}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleDeleteConfirm}
+            disabled={deletingLinkId !== null}
+            style={{ backgroundColor: '#f44336', borderColor: '#f44336' }}
+          >
+            {deletingLinkId ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Edit Alias Modal */}
+      <Modal
+        isOpen={editingLinkId !== null}
+        onClose={handleCancelEdit}
+        title="Edit Custom Alias"
+        size="small"
+      >
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label className="form-label" htmlFor="edit-alias-input">
+            Custom Alias
+          </label>
+          <input
+            id="edit-alias-input"
+            className="form-input"
+            type="text"
+            value={editAliasValue}
+            onChange={(e) => setEditAliasValue(e.target.value)}
+            placeholder="custom-alias"
+            disabled={savingLinkId !== null}
+          />
+          {editError && (
+            <div style={{ color: '#f44336', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              {editError}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleCancelEdit}
+            disabled={savingLinkId !== null}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => handleSaveEdit(links.find(l => l._id === editingLinkId))}
+            disabled={savingLinkId !== null}
+          >
+            {savingLinkId ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

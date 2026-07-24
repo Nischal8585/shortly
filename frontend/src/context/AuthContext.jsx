@@ -12,10 +12,16 @@ export function AuthProvider({ children }) {
     async function restoreSession() {
       const token = localStorage.getItem('shortly_auth_token');
       if (token) {
-        setIsAuthenticated(true);
-        setUser(null);
-        
-        // TODO: GET /api/auth/me integration goes here to fetch fresh user profile data
+        try {
+          setIsAuthenticated(true);
+          const response = await authService.getMe();
+          setUser(response.data);
+        } catch (err) {
+          console.error('Session restoration failed:', err);
+          localStorage.removeItem('shortly_auth_token');
+          setIsAuthenticated(false);
+          setUser(null);
+        }
       } else {
         setIsAuthenticated(false);
         setUser(null);

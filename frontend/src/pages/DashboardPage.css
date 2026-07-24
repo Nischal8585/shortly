@@ -211,6 +211,122 @@
   color: #991b1b;
 }
 
+/* Inline Editing Styling */
+.edit-alias-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  max-width: 320px;
+}
+
+.edit-alias-prefix {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.edit-alias-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  outline: none;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+  min-width: 120px;
+}
+
+.edit-alias-input:focus {
+  border-color: var(--color-text-primary);
+}
+
+.edit-alias-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-edit-save {
+  padding: 4px 10px;
+  height: 28px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.btn-edit-cancel {
+  padding: 4px 10px;
+  height: 28px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.btn-edit-cancel:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
+/* Delete Button Styling */
+.btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 6px 10px;
+  height: 32px;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.btn-delete:hover {
+  color: #991b1b;
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.btn-delete:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background-color: transparent;
+}
+
+.btn-delete:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.edit-alias-error {
+  color: #991b1b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: 0.1rem;
+}
+
+.edit-alias-success {
+  color: #166534;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  animation: fadeIn var(--transition-fast) ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Pulse Animation Skeletons */
 .skeleton-loader {
   display: flex;

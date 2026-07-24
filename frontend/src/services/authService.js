@@ -63,6 +63,20 @@ export const authService = {
    */
   logout() {
     localStorage.removeItem('shortly_auth_token');
+  },
+
+  /**
+   * Fetches current authenticated user details.
+   *
+   * @returns {Promise<any>} User payload data
+   */
+  async getMe() {
+    try {
+      const response = await api.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 };
 

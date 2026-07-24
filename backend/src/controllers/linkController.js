@@ -1,4 +1,5 @@
 const linkService = require('../services/linkService');
+const path = require('path');
 
 /**
  * POST /api/links
@@ -92,6 +93,13 @@ const redirectToOriginalUrl = async (req, res, next) => {
 
     return res.redirect(302, originalUrl);
   } catch (error) {
+    // Only handle Link Not Found errors for browsers
+    if (error.statusCode === 404 && error.isLinkNotFound) {
+      if (req.accepts('html')) {
+        return res.status(404).sendFile(path.join(__dirname, '../../public/errors/404.html'));
+      }
+    }
+    // All other errors pass to existing error middleware
     return next(error);
   }
 };

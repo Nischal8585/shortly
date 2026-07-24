@@ -59,9 +59,9 @@ function validateCustomAlias(alias) {
     throw error;
   }
 
-  const aliasRegex = /^[a-zA-Z0-9-]+$/;
+  const aliasRegex = /^[a-zA-Z0-9-_]+$/;
   if (!aliasRegex.test(trimmed)) {
-    const error = new Error('Custom alias can only contain alphanumeric characters and dashes');
+    const error = new Error('Custom alias can only contain alphanumeric characters, dashes, and underscores');
     error.statusCode = 400;
     throw error;
   }
@@ -151,7 +151,7 @@ const getUserLinks = async (userId) => {
  */
 const updateLink = async (userId, linkId, updateData) => {
   const link = await linkRepository.findById(linkId);
-  if (!link) {
+  if (!link || !link.isActive) {
     const error = new Error('Link not found');
     error.statusCode = 404;
     throw error;
@@ -203,7 +203,7 @@ const updateLink = async (userId, linkId, updateData) => {
  */
 const deleteLink = async (userId, linkId) => {
   const link = await linkRepository.findById(linkId);
-  if (!link) {
+  if (!link || !link.isActive) {
     const error = new Error('Link not found');
     error.statusCode = 404;
     throw error;
@@ -222,16 +222,11 @@ const deleteLink = async (userId, linkId) => {
  * Resolves a shortCode to its original URL, logging redirect clicks.
  */
 const resolveShortCode = async (shortCode) => {
-  const link = await linkRepository.findByShortCode(shortCode);
+  const link = await linkRepository.findActiveByShortCode(shortCode);
   if (!link) {
     const error = new Error('Link not found');
     error.statusCode = 404;
-    throw error;
-  }
-
-  if (!link.isActive) {
-    const error = new Error('Link is inactive');
-    error.statusCode = 403;
+    error.isLinkNotFound = true; // Temporary marker for content negotiation
     throw error;
   }
 

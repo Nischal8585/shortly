@@ -23,6 +23,13 @@ const findByShortCode = async (shortCode) => {
 };
 
 /**
+ * Retrieves an active link document by its unique shortCode.
+ */
+const findActiveByShortCode = async (shortCode) => {
+  return Link.findOne({ shortCode, isActive: true }).exec();
+};
+
+/**
  * Retrieves a link document by its customAlias.
  */
 const findByCustomAlias = async (alias) => {
@@ -30,10 +37,10 @@ const findByCustomAlias = async (alias) => {
 };
 
 /**
- * Retrieves all link documents owned by the specified user, sorted by creation date descending.
+ * Retrieves all link documents owned by the specified user, sorted by creation date descending, excluding soft-deleted links.
  */
 const findByUser = async (userId) => {
-  return Link.find({ user: userId }).sort({ createdAt: -1 }).exec();
+  return Link.find({ user: userId, isActive: { $ne: false } }).sort({ createdAt: -1 }).exec();
 };
 
 /**
@@ -75,6 +82,7 @@ module.exports = {
   createLink,
   findById,
   findByShortCode,
+  findActiveByShortCode,
   findByCustomAlias,
   findByUser,
   updateLink,

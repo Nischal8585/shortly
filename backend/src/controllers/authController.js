@@ -33,7 +33,19 @@ const login = async (req, res, next) => {
   }
 };
 
+const getMe = async (req, res, next) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      data: req.user
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   register,
-  login
+  login,
+  getMe
 };
