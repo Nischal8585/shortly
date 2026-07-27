@@ -361,10 +361,10 @@ M1: Foundation ──> M2: Auth ──> M3: URL CRUD ──> M4: Layout ──> 
 - Render the recent links grid with active copy buttons.
 
 ### Milestone 5: Link Redirection & Analytics
-- Write detailed Click schema.
+- Write basic Link click schema.
 - Implement redirection route `GET /:code` yielding immediate 302 responses.
-- Implement background logging of click parameters.
-- Build analytics charts and aggregates showing device, browser, and timeline counts.
+- Implement click counter increments.
+- Visual report page layout showing basic link redirection summaries. (Advanced timeline, device, browser charts are deferred to Version 2; see [FUTURE_ANALYTICS_V2.md](file:///Users/nischal/Desktop/shortly/docs/FUTURE_ANALYTICS_V2.md) for roadmap).
 
 ### Milestone 6: QR Code System
 - Integrate client-side QR renderer in the dashboard.

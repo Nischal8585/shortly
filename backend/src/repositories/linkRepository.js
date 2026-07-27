@@ -37,10 +37,10 @@ const findByCustomAlias = async (alias) => {
 };
 
 /**
- * Retrieves all link documents owned by the specified user, sorted by creation date descending, excluding soft-deleted links.
+ * Retrieves all link documents owned by the specified user, sorted by creation date descending.
  */
 const findByUser = async (userId) => {
-  return Link.find({ user: userId, isActive: { $ne: false } }).sort({ createdAt: -1 }).exec();
+  return Link.find({ user: userId }).sort({ createdAt: -1 }).exec();
 };
 
 /**
@@ -51,10 +51,10 @@ const updateLink = async (id, updates) => {
 };
 
 /**
- * Soft deletes a link document by setting its isActive status flag to false.
+ * Deletes a link document by its primary key.
  */
-const softDelete = async (id) => {
-  return Link.findByIdAndUpdate(id, { isActive: false }, { new: true }).exec();
+const deleteById = async (id) => {
+  return Link.findByIdAndDelete(id).exec();
 };
 
 /**
@@ -86,7 +86,7 @@ module.exports = {
   findByCustomAlias,
   findByUser,
   updateLink,
-  softDelete,
+  deleteById,
   incrementClickCount,
   updateLastClicked
 };

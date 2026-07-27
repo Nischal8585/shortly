@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar/Navbar';
-import EmptyState from '../components/ui/EmptyState/EmptyState';
 import linkService from '../services/linkService';
 import { getShortUrl } from '../utils/linkUtils';
+import GlobalAnalytics from './GlobalAnalytics';
+import LinkAnalytics from './LinkAnalytics';
 import './AnalyticsPage.css';
 
 const AnalyticsIcon = (
@@ -28,86 +29,90 @@ const CheckIcon = (
 );
 
 /**
- * AnalyticsPage — Detailed click statistics dashboard with link information.
+ * AnalyticsPage — Wrapper controller deciding whether to render GlobalAnalytics or LinkAnalytics.
  */
 function AnalyticsPage() {
   const { linkId } = useParams();
+  const [links, setLinks] = useState([]);
   const [link, setLink] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+
   useEffect(() => {
-    const fetchLink = async () => {
-      if (!linkId) {
-        setLoading(false);
-        return;
-      }
+    let cancelled = false;
+    const fetchLinksAndDetails = async () => {
+      setLoading(true);
       try {
         const response = await linkService.getLinks();
+        if (cancelled) return;
+        const linksList = response.data || [];
+        setLinks(linksList);
 
-        const links = response.data || [];
-        const linkData = links.find(link => link._id === linkId);
-        if (!linkData) {
-          setError('Link not found');
-          return;
+        if (linkId) {
+          const linkData = linksList.find(l => l._id === linkId);
+          if (!linkData) {
+            setError('Link not found');
+          } else {
+            setLink(linkData);
+            setError(null);
+          }
+        } else {
+          setLink(null);
+          setError(null);
         }
-        setLink(linkData);
       } catch (err) {
+        if (cancelled) return;
         console.error('Analytics fetch failed:', err);
-        setError(err.message || 'Failed to load link information');
+        setError(err.message || 'Failed to load analytics information');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchLink();
+    fetchLinksAndDetails();
+
+    return () => {
+      cancelled = true;
+    };
   }, [linkId]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    }).replace(',', ' •');
-  };
-
-
 
   const handleCopy = async () => {
     if (!link) return;
     const fullUrl = getShortUrl(link.shortCode);
     try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable (requires HTTPS or localhost)');
+      }
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
       console.error('Failed to copy:', err);
+      setError('Could not copy the short URL. Copy it manually instead.');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="analytics-page">
-        <Navbar />
-        <main className="container" style={{ padding: 'var(--spacing-xl) 0' }}>
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-            Loading...
-          </div>
-        </main>
-      </div>
-    );
-  }
+if (loading) {
+  return (
+    <div className="analytics-page">
+      <Navbar />
+      <main className="container" style={{ padding: 'var(--spacing-xl) 0' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+          Loading...
+        </div>
+      </main>
+    </div>
+  );
+}
 
-  if (error || !link) {
-    return (
-      <div className="analytics-page">
-        <Navbar />
-        <main className="container" style={{ padding: 'var(--spacing-xl) 0' }}>
+return (
+  <div className="analytics-page">
+    <Navbar />
+
+    <main className="container" style={{ padding: 'var(--spacing-xl) 0' }}>
+      {linkId ? (
+        error || !link ? (
           <div className="link-information link-information__empty">
             <div className="link-information__empty-icon">
               {AnalyticsIcon}
@@ -117,158 +122,24 @@ function AnalyticsPage() {
               {error || 'The link you are looking for does not exist or has been deleted.'}
             </p>
           </div>
-        </main>
-      </div>
-    );
-  }
-
-  return (
-    <div className="analytics-page">
-      <Navbar />
-
-      <main className="container" style={{ padding: 'var(--spacing-xl) 0' }}>
-        <div className="link-information">
-          <h2 className="link-information__header">Link Information</h2>
-          
-          <div className="link-information__grid">
-            <div className="link-information__field">
-              <label className="link-information__label">Original URL</label>
-              <div className="link-information__url" title={link.originalUrl}>
-                {link.originalUrl}
-              </div>
-            </div>
-
-            <div className="link-information__field">
-              <label className="link-information__label">Short URL</label>
-              <div className="link-information__short-url">
-                <a 
-                  href={getShortUrl(link.shortCode)} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="link-information__short-url-link"
-                  title={getShortUrl(link.shortCode)}
-                >
-                  {getShortUrl(link.shortCode)}
-                </a>
-                <button
-                  className="link-information__copy-button"
-                  onClick={handleCopy}
-                  aria-label="Copy short URL"
-                  title="Copy short URL"
-                >
-                  {copied ? CheckIcon : CopyIcon}
-                </button>
-              </div>
-            </div>
-
-            <div className="link-information__field">
-              <label className="link-information__label">Created Date & Time</label>
-              <div className="link-information__value">
-                {formatDate(link.createdAt)}
-              </div>
-            </div>
-
-            <div className="link-information__field">
-              <label className="link-information__label">Total Clicks</label>
-              <div className="link-information__value">
-                {link.clicks.toLocaleString()}
-              </div>
-            </div>
-
-            <div className="link-information__field">
-              <label className="link-information__label">Current Status</label>
-              <span className={`link-information__status link-information__status--${link.isActive ? 'active' : 'deleted'}`}>
-                {link.isActive ? 'Active' : 'Deleted'}
-              </span>
-            </div>
-
-            {/* Future fields can be added here without layout changes */}
-            {/* Examples: First Click, Last Click, QR Code, Expiry, etc. */}
-          </div>
-        </div>
-
-        {/* 
-          FUTURE ENHANCEMENTS
-          ===================
-          
-          The following features are planned for future implementation but are not included in Phase 1:
-          
-          1. First Click
-             - Display timestamp of first click
-             - Requires: firstClickedAt field in Link model
-          
-          2. Last Click
-             - Display timestamp of most recent click
-             - Already available: lastClickedAt field exists in Link model
-             - Implementation: Add field to Link Information section
-          
-          3. Click Timeline
-             - Visual chart showing clicks over time
-             - Requires: Click history collection or aggregation
-             - Implementation: Chart component (e.g., Chart.js, Recharts)
-          
-          4. Device Breakdown
-             - Percentage breakdown by device type (mobile, tablet, desktop)
-             - Requires: User agent tracking on click
-             - Implementation: Pie chart or progress bars
-          
-          5. Browser Breakdown
-             - Percentage breakdown by browser (Chrome, Firefox, Safari, etc.)
-             - Requires: User agent tracking on click
-             - Implementation: Pie chart or progress bars
-          
-          6. Referrer Statistics
-             - Top referrers driving traffic to the link
-             - Requires: Referrer tracking on click
-             - Implementation: List of top referrers with click counts
-          
-          7. Country Analytics
-             - Geographic distribution of clicks by country
-             - Requires: IP geolocation on click
-             - Implementation: Map visualization or country list
-          
-          8. QR Code
-             - Generate and display QR code for the short URL
-             - Requires: QR code generation library (e.g., qrcode.react)
-             - Implementation: QR code component with download option
-          
-          9. Expiry Date
-             - Display link expiry date if set
-             - Requires: expiryDate field in Link model
-             - Implementation: Add field to Link Information section
-          
-          10. Click Heatmap
-              - Visual representation of click activity by time of day/day of week
-              - Requires: Click history with timestamps
-              - Implementation: Heatmap chart component
-          
-          11. UTM Parameter Tracking
-              - Display UTM parameters from referrers
-              - Requires: UTM parameter parsing and storage
-              - Implementation: UTM parameter breakdown table
-          
-          12. A/B Testing
-              - Compare performance of multiple short URLs
-              - Requires: A/B test configuration and tracking
-              - Implementation: Comparison metrics and charts
-          
-          ARCHITECTURAL NOTES:
-          - All future enhancements should follow the existing grid layout pattern
-          - New fields can be added to link-information__grid without layout changes
-          - Chart components should be added below Link Information section
-          - Backend changes required for tracking features (user agent, referrer, geolocation)
-          - Consider pagination for large datasets (click history)
-          - Maintain editorial minimal design language
-        */}
-
-        <EmptyState
-          icon={AnalyticsIcon}
-          title="No analytics yet."
-          description="Analytics will appear after your first link receives clicks."
+        ) : (
+          <LinkAnalytics
+            link={link}
+            copied={copied}
+            handleCopy={handleCopy}
+            checkIcon={CheckIcon}
+            copyIcon={CopyIcon}
+          />
+        )
+      ) : (
+        <GlobalAnalytics
+          links={links}
+          analyticsIcon={AnalyticsIcon}
         />
-      </main>
-    </div>
-  );
+      )}
+    </main>
+  </div>
+);
 }
 
 export default AnalyticsPage;

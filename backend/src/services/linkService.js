@@ -30,7 +30,7 @@ function validateOriginalUrl(url) {
   const trimmedUrl = url.trim();
   try {
     const parsedUrl = new URL(trimmedUrl);
-    
+
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       const error = new Error('URL protocol must be HTTP or HTTPS');
       error.statusCode = 400;
@@ -151,7 +151,7 @@ const getUserLinks = async (userId) => {
  */
 const updateLink = async (userId, linkId, updateData) => {
   const link = await linkRepository.findById(linkId);
-  if (!link || !link.isActive) {
+  if (!link) {
     const error = new Error('Link not found');
     error.statusCode = 404;
     throw error;
@@ -199,11 +199,17 @@ const updateLink = async (userId, linkId, updateData) => {
 };
 
 /**
- * Soft deletes a link by toggling its active status to false.
+ * Updates the isActive status of a link, validating ownership.
  */
-const deleteLink = async (userId, linkId) => {
+const updateLinkStatus = async (userId, linkId, isActive) => {
+  if (typeof isActive !== 'boolean') {
+    const error = new Error('isActive must be a boolean value');
+    error.statusCode = 400;
+    throw error;
+  }
+
   const link = await linkRepository.findById(linkId);
-  if (!link || !link.isActive) {
+  if (!link) {
     const error = new Error('Link not found');
     error.statusCode = 404;
     throw error;
@@ -215,22 +221,49 @@ const deleteLink = async (userId, linkId) => {
     throw error;
   }
 
-  return linkRepository.softDelete(linkId);
+  return linkRepository.updateLink(linkId, { isActive });
 };
 
 /**
- * Resolves a shortCode to its original URL, logging redirect clicks.
+ * Deletes a link, validating permissions and constraints.
  */
-const resolveShortCode = async (shortCode) => {
-  const link = await linkRepository.findActiveByShortCode(shortCode);
+const deleteLink = async (userId, linkId) => {
+  const link = await linkRepository.findById(linkId);
   if (!link) {
     const error = new Error('Link not found');
     error.statusCode = 404;
-    error.isLinkNotFound = true; // Temporary marker for content negotiation
     throw error;
   }
 
-  // Record click (single repository operation updating both clicks and timestamp)
+  if (link.user.toString() !== userId.toString()) {
+    const error = new Error('Access denied. You do not own this link.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return linkRepository.deleteById(linkId);
+};
+
+/**
+ * Resolves a shortCode to its original URL, logging redirect clicks if active.
+ */
+const resolveShortCode = async (shortCode) => {
+  const link = await linkRepository.findByShortCode(shortCode);
+  if (!link) {
+    const error = new Error('Link not found');
+    error.statusCode = 404;
+    error.isLinkNotFound = true;
+    throw error;
+  }
+
+  if (!link.isActive) {
+    const error = new Error('This short link has been disabled.');
+    error.statusCode = 410;
+    error.isLinkInactive = true;
+    throw error;
+  }
+
+  // Record click
   await linkRepository.incrementClickCount(link._id);
 
   return link.originalUrl;
@@ -240,6 +273,7 @@ module.exports = {
   createShortLink,
   getUserLinks,
   updateLink,
+  updateLinkStatus,
   deleteLink,
   resolveShortCode
 };

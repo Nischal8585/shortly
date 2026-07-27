@@ -83,6 +83,22 @@ export const linkService = {
     } catch (error) {
       throw normalizeError(error);
     }
+  },
+
+  /**
+   * Updates only the active status (pause/resume) of a link.
+   *
+   * @param {string} id - The link database ID
+   * @param {boolean} isActive
+   * @returns {Promise<any>} Response payload data
+   */
+  async updateLinkStatus(id, isActive) {
+    try {
+      const response = await api.patch(`/links/${id}/status`, { isActive });
+      return response.data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 };
 

@@ -13,9 +13,9 @@ export function AuthProvider({ children }) {
       const token = localStorage.getItem('shortly_auth_token');
       if (token) {
         try {
-          setIsAuthenticated(true);
           const response = await authService.getMe();
           setUser(response.data);
+          setIsAuthenticated(true);
         } catch (err) {
           console.error('Session restoration failed:', err);
           localStorage.removeItem('shortly_auth_token');
@@ -37,10 +37,10 @@ export function AuthProvider({ children }) {
     try {
       const response = await authService.login({ email, password });
       const { token, user: backendUser } = response.data;
-      
+
       // Persist ONLY token in localStorage
       localStorage.setItem('shortly_auth_token', token);
-      
+
       setUser(backendUser);
       setIsAuthenticated(true);
     } finally {
@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
       value={{
         isAuthenticated,
         user,
+        setUser,
         authLoading,
         login,
         register,

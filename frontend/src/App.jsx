@@ -177,7 +177,11 @@ function App() {
           />
           <Route
             path="/analytics"
-            element={<Navigate to="/dashboard" replace />}
+            element={
+              <ProtectedRoute>
+                <AnalyticsPage />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/analytics/:linkId"

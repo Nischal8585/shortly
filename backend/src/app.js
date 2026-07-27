@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const path = require('path');
 const authRoutes = require('./routes/authRoutes');
 const linkRoutes = require('./routes/linkRoutes');
+const userRoutes = require('./routes/userRoutes');
 const redirectRoutes = require('./routes/redirectRoutes');
 const errorMiddleware = require('./middlewares/errorMiddleware');
 
@@ -41,6 +42,7 @@ app.get('/config', (req, res) => {
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/links', linkRoutes);
+app.use('/api/users', userRoutes);
 app.use('/', redirectRoutes);
 
 // Global 404 handler

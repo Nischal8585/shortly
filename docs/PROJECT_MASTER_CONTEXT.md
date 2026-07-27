@@ -306,17 +306,18 @@ Project Version
 
 Development Phase
 
-**Milestone 3 — Link Management**
+**Milestone 5 — Profile Management**
 
 Overall Progress
 
 - ✅ Project Foundation (Phase 1)
 - ✅ User Authentication Module (Phase 2 & 4)
 - ✅ Link Management Architecture & Database Design (Sprint 5A.1 - Reviewed & Frozen)
+- ✅ Profile Management (Milestone 5)
 
 Current Task
 
-Begin Sprint 5B backend implementation — integrate controller routes, services, schemas, click logging, and unit/integration tests.
+Complete remaining Version 1 stabilization and deployment prep.
 
 ---
 
@@ -901,6 +902,35 @@ To maintain visual consistency and avoid fake data, Shortly uses a reusable `Emp
 
 ---
 
+# 18. Profile Management
+
+## Overview
+Shortly supports profile management allowing users to update their profile details (Full Name and Phone Number) while keeping sensitive and metadata fields read-only.
+
+## Specifications
+- **Editable Fields**:
+  - Full Name: Required, trimmed, length between 2 and 50 characters.
+  - Phone Number: Optional, normalized E.164 international phone number format.
+- **Read-only Fields**:
+  - Email Address
+  - Member Since
+- **Phone Number Normalization & Validation**:
+  - Phone numbers are validated on both frontend and backend using `libphonenumber-js`.
+  - Stored format follows the international **E.164** standard (e.g. `+919918727343` or `+14155552671`) which strips all spaces, dashes, or special characters except for the leading plus (`+`) prefix.
+  - Rendered format uses international spacing layouts (e.g. `+91 99187 27343`) via `formatInternational()`.
+  - In edit mode, the frontend uses `react-phone-number-input` defaulting to India (`+91`), offering a list of selectable country codes, input constraint enforcement, and immediate visual feedback.
+
+## REST API Details
+- **Route**: `PATCH /api/users/profile`
+- **Authentication**: Protected. Requires a valid bearer JWT token in the `Authorization` header.
+- **Payload Validation**:
+  - Validates `fullName` length (2–50 characters) and requires it.
+  - Validates `phoneNumber` if provided, using `parsePhoneNumberFromString()` checking validity and possibility.
+  - If phone number is empty, clears fields to `null`.
+  - Strictly rejects any other parameters in request payload (e.g. `email`, `password`, `_id`, `createdAt`) with a `400 Bad Request` response.
+
+---
+
 # End of Part 2
 
 | Feature | Status | Reviewed | Tested |
@@ -914,4 +944,5 @@ To maintain visual consistency and avoid fake data, Shortly uses a reusable `Emp
 | Error Middleware | ✅ | ✅ | ✅ |
 | JWT Middleware | ✅ | ✅ | ✅ |
 | Frontend Auth Integration | ✅ | ✅ | ✅ |
+| Profile Management | ✅ | ✅ | ✅ |
 

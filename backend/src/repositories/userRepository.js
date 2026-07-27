@@ -17,8 +17,17 @@ const findUserById = async (userId) => {
   return await User.findById(userId).exec();
 };
 
+const updateUser = async (userId, updateData) => {
+  return await User.findByIdAndUpdate(
+    userId,
+    { $set: updateData },
+    { new: true, runValidators: true }
+  ).exec();
+};
+
 module.exports = {
   createUser,
   findUserByEmail,
-  findUserById
+  findUserById,
+  updateUser
 };

@@ -12,7 +12,7 @@ import './Modal.css';
  * @param {string}            [props.size='md']
  */
 function Modal({ isOpen, onClose, title, children, size = 'md' }) {
-  if (!isOpen) return null;
+  const titleId = React.useId();
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -27,15 +27,18 @@ function Modal({ isOpen, onClose, title, children, size = 'md' }) {
   };
 
   React.useEffect(() => {
+    if (!isOpen) return;
     document.addEventListener('keydown', handleEscapeKey);
     return () => document.removeEventListener('keydown', handleEscapeKey);
-  }, [onClose]);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-labelledby={title}>
+    <div className="modal-backdrop" onClick={handleBackdropClick} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className={`modal-content modal-content--${size}`}>
         <div className="modal-header">
-          <h2 className="modal-title" id={title}>{title}</h2>
+          <h2 className="modal-title" id={titleId}>{title}</h2>
           <button
             className="modal-close"
             onClick={onClose}

@@ -3,6 +3,7 @@ import Navbar from '../components/layout/Navbar/Navbar';
 import { useAuth } from '../context/AuthContext';
 import EmptyState from '../components/ui/EmptyState/EmptyState';
 import Modal from "../components/ui/Modal";
+import QRCodeModal from "../components/ui/QRCodeModal";
 import linkService from '../services/linkService';
 import { getShortUrl } from '../utils/linkUtils';
 import './DashboardPage.css';
@@ -46,7 +47,39 @@ function DashboardPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState(null);
 
-  const fetchLinks = async () => {
+  // QR tracking states
+  const [selectedQrLink, setSelectedQrLink] = useState(null);
+
+  // Status toggle states
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusModalLink, setStatusModalLink] = useState(null);
+  const [updatingStatusLinkId, setUpdatingStatusLinkId] = useState(null);
+  const [notification, setNotification] = useState({ message: '', type: '' });
+
+  // Search & Filter state hooks
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const editingLink =
+    links.find((link) => link._id === editingLinkId) ?? null;
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const lastFetchTimeRef = React.useRef(0);
+
+  const fetchLinks = async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchTimeRef.current < 1000) {
+      return;
+    }
+    lastFetchTimeRef.current = now;
+
     setLoading(true);
     setError(null);
     try {
@@ -61,28 +94,110 @@ function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchLinks();
+    fetchLinks(true);
   }, []);
+
   useEffect(() => {
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      fetchLinks();
+    const handleSync = () => {
+      if (document.visibilityState === 'visible' || document.hasFocus()) {
+        fetchLinks();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('focus', handleSync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, []);
+
+  // Polling: Auto-refresh click parameters every 15 seconds when active
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchLinks();
+      }
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Compute filtered dataset
+  const filteredLinks = React.useMemo(() => {
+    return links
+      .filter((link) => {
+        if (statusFilter === 'active') return link.isActive === true;
+        if (statusFilter === 'inactive') return link.isActive === false;
+        return true;
+      })
+      .filter((link) => {
+        const query = debouncedSearchQuery.trim().toLowerCase();
+        if (!query) return true;
+
+        const originalUrlMatch = link.originalUrl?.toLowerCase().includes(query);
+        const shortCodeMatch = link.shortCode?.toLowerCase().includes(query);
+        const customAliasMatch = link.customAlias?.toLowerCase().includes(query);
+
+        return originalUrlMatch || shortCodeMatch || customAliasMatch;
+      });
+  }, [links, statusFilter, debouncedSearchQuery]);
+
+  // Compute metrics (derived from the full dataset for global visibility)
+  const totalLinks = links.length;
+  const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0);
+
+  // Filter reset handler
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+  };
+
+  // Notification trigger helper
+  const triggerNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification((prev) => prev.message === message ? { message: '', type: '' } : prev);
+    }, 3000);
+  };
+
+  // Status toggle modal actions
+  const handleToggleStatusClick = (link) => {
+    setStatusModalLink(link);
+    setShowStatusModal(true);
+  };
+
+  const handleToggleStatusConfirm = async () => {
+    if (!statusModalLink) return;
+    const targetStatus = !statusModalLink.isActive;
+    const linkId = statusModalLink._id;
+
+    setUpdatingStatusLinkId(linkId);
+    setShowStatusModal(false);
+
+    try {
+      await linkService.updateLinkStatus(linkId, targetStatus);
+      triggerNotification(
+        `Link ${targetStatus ? 'resumed' : 'paused'} successfully.`,
+        'success'
+      );
+      await fetchLinks(true); // Refetches using standard sync flow
+    } catch (err) {
+      triggerNotification(
+        err.message || 'Unable to update link status.',
+        'error'
+      );
+    } finally {
+      setUpdatingStatusLinkId(null);
+      setStatusModalLink(null);
     }
   };
 
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  return () => {
-    document.removeEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    );
+  const handleToggleStatusCancel = () => {
+    setShowStatusModal(false);
+    setStatusModalLink(null);
   };
-}, []);
-
-  // Compute metrics
-  const totalLinks = links.length;
-  const totalClicks = links.reduce((sum, link) => sum + (link.clicks || 0), 0);
 
   // Copy action handler
   const handleCopy = async (link) => {
@@ -122,7 +237,7 @@ function DashboardPage() {
       setEditingLinkId(null);
       setEditAliasValue('');
       setTimeout(() => setEditSuccessLinkId(null), 3000);
-      await fetchLinks();
+      await fetchLinks(true);
     } catch (err) {
       setEditError(err.message || 'Failed to update alias');
     } finally {
@@ -143,9 +258,11 @@ function DashboardPage() {
       await linkService.deleteLink(linkToDelete._id);
       setShowDeleteModal(false);
       setLinkToDelete(null);
-      await fetchLinks();
+      await fetchLinks(true);
     } catch (err) {
-      console.error('Delete failed:', err);
+      setShowDeleteModal(false);
+      setLinkToDelete(null);
+      triggerNotification(err.message || 'Unable to delete link.', 'error');
     } finally {
       setDeletingLinkId(null);
     }
@@ -179,7 +296,7 @@ function DashboardPage() {
       setTimeout(() => setFormSuccess(null), 5000);
 
       // Re-fetch listing data
-      await fetchLinks();
+      await fetchLinks(true);
     } catch (err) {
       setFormError(err.message || 'An error occurred during link generation.');
     } finally {
@@ -211,7 +328,7 @@ function DashboardPage() {
 
           <div className="card">
             <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>Shorten a link</h2>
-            
+
             {formSuccess && (
               <div className="form-alert form-alert-success">
                 <span>{formSuccess}</span>
@@ -275,6 +392,19 @@ function DashboardPage() {
             </div>
           )}
 
+          {notification.message && (
+            <div className={`form-alert form-alert-${notification.type}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
+              <span>{notification.message}</span>
+              <button
+                type="button"
+                onClick={() => setNotification({ message: '', type: '' })}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 'bold', fontSize: '1rem' }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="skeleton-loader">
               <div className="skeleton-row" style={{ height: '80px', marginBottom: '1.5rem' }}></div>
@@ -294,124 +424,228 @@ function DashboardPage() {
             />
           ) : (
             <>
-              {/* Metrics Overview */}
-              <div className="metrics-grid">
-                <div className="metric-card">
-                  <span className="metric-value">{totalLinks}</span>
-                  <span className="metric-label">Total Links</span>
+              {/* Search & Filter Toolbar */}
+              <div className="search-filter-toolbar">
+                <div className="search-input-wrapper">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Search by URL or short code..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search short links"
+                  />
+                  <svg
+                    className="search-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
                 </div>
-                <div className="metric-card">
-                  <span className="metric-value">{totalClicks}</span>
-                  <span className="metric-label">Total Clicks</span>
+                <div className="filter-group">
+                  <button
+                    type="button"
+                    className={`btn-filter ${statusFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-filter ${statusFilter === 'active' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('active')}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-filter ${statusFilter === 'inactive' ? 'active' : ''}`}
+                    onClick={() => setStatusFilter('inactive')}
+                  >
+                    Inactive
+                  </button>
                 </div>
               </div>
 
-              {/* Links Table */}
-              <div className="table-container">
-                <table className="links-table">
-                  <thead>
-                    <tr>
-                      <th>Original URL</th>
-                      <th>Short URL</th>
-                      <th>Clicks</th>
-                      <th>Created Date</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {links.map((link) => (
-                      <tr key={link._id}>
-                        <td>
-                          <div className="url-cell" title={link.originalUrl}>
-                            {link.originalUrl}
-                          </div>
-                        </td>
-                        <td>
-                          <a
-                            className="short-url-link"
-                            href={getShortUrl(link.shortCode)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
-                          </a>
-                        </td>
-                        <td>{link.clicks || 0}</td>
-                        <td>
-                          {new Date(link.createdAt).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </td>
-                        <td>
-                          <span className={`status-badge ${link.isActive ? 'active' : 'inactive'}`}>
-                            {link.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <button
-                              className={`btn-copy ${copiedLinkId === link._id ? 'copied' : ''}`}
-                              onClick={() => handleCopy(link)}
-                              aria-label="Copy short URL to clipboard"
-                              title={copiedLinkId === link._id ? "Copied!" : "Copy URL"}
-                            >
-                              {copiedLinkId === link._id ? (
-                                <span className="copy-feedback-text">✓</span>
-                              ) : copyErrorLinkId === link._id ? (
-                                <span className="copy-feedback-error">✗</span>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              className="btn-copy"
-                              onClick={() => handleStartEdit(link)}
-                              aria-label="Edit custom alias"
-                              title="Edit custom alias"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 20h9" />
-                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                              </svg>
-                            </button>
-                            <button
-                              className="btn-copy"
-                              onClick={() => window.location.href = `/analytics/${link._id}`}
-                              aria-label="View analytics"
-                              title="View analytics"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="20" x2="18" y2="10" />
-                                <line x1="12" y1="20" x2="12" y2="4" />
-                                <line x1="6" y1="20" x2="6" y2="14" />
-                              </svg>
-                            </button>
-                            <button
-                              className="btn-copy"
-                              onClick={() => handleDeleteClick(link)}
-                              disabled={deletingLinkId === link._id}
-                              aria-label="Delete link"
-                              title="Delete link"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M3 6h18" />
-                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {filteredLinks.length === 0 ? (
+                <EmptyState
+                  icon={
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.3-4.3" />
+                      <line x1="8" y1="11" x2="14" y2="11" />
+                    </svg>
+                  }
+                  title="No search results found"
+                  description="We couldn't find any links matching your search query or status filter criteria."
+                  action={{
+                    label: "Reset search and filters",
+                    onClick: handleResetFilters
+                  }}
+                />
+              ) : (
+                <>
+                  {/* Metrics Overview */}
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <span className="metric-value">{totalLinks}</span>
+                      <span className="metric-label">Total Links</span>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-value">{totalClicks}</span>
+                      <span className="metric-label">Total Clicks</span>
+                    </div>
+                  </div>
+
+                  {/* Links Table */}
+                  <div className="table-container">
+                    <table className="links-table">
+                      <thead>
+                        <tr>
+                          <th>Original URL</th>
+                          <th>Short URL</th>
+                          <th>Clicks</th>
+                          <th>Created Date</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLinks.map((link) => (
+                          <tr key={link._id}>
+                            <td>
+                              <div className="url-cell" title={link.originalUrl}>
+                                {link.originalUrl}
+                              </div>
+                            </td>
+                            <td>
+                              <a
+                                className="short-url-link"
+                                href={getShortUrl(link.shortCode)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {getShortUrl(link.shortCode).replace(/^https?:\/\//, '')}
+                              </a>
+                            </td>
+                            <td>{link.clicks || 0}</td>
+                            <td>
+                              {new Date(link.createdAt).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </td>
+                            <td>
+                              <span className={`status-badge ${link.isActive ? 'active' : 'inactive'}`}>
+                                {link.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <button
+                                  className={`btn-copy ${copiedLinkId === link._id ? 'copied' : ''}`}
+                                  onClick={() => handleCopy(link)}
+                                  aria-label="Copy short URL to clipboard"
+                                  title={copiedLinkId === link._id ? "Copied!" : "Copy URL"}
+                                >
+                                  {copiedLinkId === link._id ? (
+                                    <span className="copy-feedback-text">✓</span>
+                                  ) : copyErrorLinkId === link._id ? (
+                                    <span className="copy-feedback-error">✗</span>
+                                  ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                    </svg>
+                                  )}
+                                </button>
+                                <button
+                                  className="btn-copy"
+                                  onClick={() => handleStartEdit(link)}
+                                  aria-label="Edit custom alias"
+                                  title="Edit custom alias"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 20h9" />
+                                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  className="btn-copy"
+                                  onClick={() => handleToggleStatusClick(link)}
+                                  aria-label={link.isActive ? "Pause link" : "Resume link"}
+                                  title={link.isActive ? "Pause link" : "Resume link"}
+                                >
+                                  {link.isActive ? (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="14" y="4" width="4" height="16" rx="1" />
+                                      <rect x="6" y="4" width="4" height="16" rx="1" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polygon points="6 3 20 12 6 21 6 3" />
+                                    </svg>
+                                  )}
+                                </button>
+                                <button
+                                  className="btn-copy"
+                                  onClick={() => window.location.href = `/analytics/${link._id}`}
+                                  aria-label="View analytics"
+                                  title="View analytics"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="20" x2="18" y2="10" />
+                                    <line x1="12" y1="20" x2="12" y2="4" />
+                                    <line x1="6" y1="20" x2="6" y2="14" />
+                                  </svg>
+                                </button>
+                                <button
+                                  className="btn-copy"
+                                  onClick={() => setSelectedQrLink(link)}
+                                  aria-label="View QR Code"
+                                  title="View QR Code"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect width="5" height="5" x="3" y="3" rx="1" />
+                                    <rect width="5" height="5" x="16" y="3" rx="1" />
+                                    <rect width="5" height="5" x="3" y="16" rx="1" />
+                                    <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+                                    <path d="M21 21v.01" />
+                                    <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+                                    <path d="M12 12v.01" />
+                                  </svg>
+                                </button>
+                                <button
+                                  className="btn-copy"
+                                  onClick={() => handleDeleteClick(link)}
+                                  disabled={deletingLinkId === link._id}
+                                  aria-label="Delete link"
+                                  title="Delete link"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18" />
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </>
           )}
         </section>
@@ -482,13 +716,52 @@ function DashboardPage() {
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => handleSaveEdit(links.find(l => l._id === editingLinkId))}
-            disabled={savingLinkId !== null}
+            onClick={() => editingLink && handleSaveEdit(editingLink)}
+            disabled={savingLinkId !== null || !editingLink}
           >
             {savingLinkId ? 'Saving...' : 'Save'}
           </button>
         </div>
       </Modal>
+
+      {/* Status Toggle Confirmation Modal */}
+      <Modal
+        isOpen={showStatusModal}
+        onClose={handleToggleStatusCancel}
+        title={statusModalLink?.isActive ? "Pause Link?" : "Resume Link?"}
+        size="small"
+      >
+        <p style={{ marginBottom: '1.5rem', lineHeight: '1.5' }}>
+          {statusModalLink?.isActive
+            ? "Users will no longer be able to access this short URL until it is resumed."
+            : "This short URL will become publicly accessible again."}
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleToggleStatusCancel}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleToggleStatusConfirm}
+            style={{
+              backgroundColor: statusModalLink?.isActive ? '#e53e3e' : 'var(--color-accent)',
+              borderColor: statusModalLink?.isActive ? '#e53e3e' : 'var(--color-accent)'
+            }}
+          >
+            {statusModalLink?.isActive ? 'Pause Link' : 'Resume Link'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* QR Code Preview Modal */}
+      <QRCodeModal
+        isOpen={selectedQrLink !== null}
+        onClose={() => setSelectedQrLink(null)}
+        link={selectedQrLink}
+      />
     </div>
   );
 }
