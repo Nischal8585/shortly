@@ -1,5 +1,8 @@
 const crypto = require('crypto');
+const geoip = require('geoip-lite');
+const UAParser = require('ua-parser-js');
 const linkRepository = require('../repositories/linkRepository');
+const clickEventRepository = require('../repositories/clickEventRepository');
 const RESERVED_ALIASES = require('../constants/reservedAliases');
 
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -247,7 +250,7 @@ const deleteLink = async (userId, linkId) => {
 /**
  * Resolves a shortCode to its original URL, logging redirect clicks if active.
  */
-const resolveShortCode = async (shortCode) => {
+const resolveShortCode = async (shortCode, clientInfo) => {
   const link = await linkRepository.findByShortCode(shortCode);
   if (!link) {
     const error = new Error('Link not found');
@@ -265,6 +268,107 @@ const resolveShortCode = async (shortCode) => {
 
   // Record click
   await linkRepository.incrementClickCount(link._id);
+
+  // Parse analytics and log click event asynchronously
+  try {
+    let country = 'Unknown';
+    let countryCode = 'Unknown';
+    let device = 'Unknown';
+    let browser = 'Unknown';
+    let operatingSystem = 'Unknown';
+    let referrer = 'Direct';
+
+    if (clientInfo) {
+      // 1. Resolve Country & Country Code using geoip-lite
+      if (clientInfo.ip) {
+        const geo = geoip.lookup(clientInfo.ip);
+        if (geo) {
+          countryCode = geo.country || 'Unknown';
+          const countryNames = {
+            IN: 'India',
+            US: 'United States',
+            GB: 'United Kingdom',
+            CA: 'Canada',
+            AU: 'Australia',
+            SG: 'Singapore',
+            DE: 'Germany',
+            FR: 'France',
+            JP: 'Japan',
+            AE: 'United Arab Emirates'
+          };
+          country = countryNames[countryCode] || countryCode;
+        }
+      }
+
+      // 2. Parse User-Agent using ua-parser-js
+      if (clientInfo.userAgent) {
+        const parser = new UAParser(clientInfo.userAgent);
+        const browserResult = parser.getBrowser();
+        const osResult = parser.getOS();
+        const deviceResult = parser.getDevice();
+
+        const rawBrowser = browserResult.name || '';
+        if (rawBrowser.includes('Chrome')) browser = 'Chrome';
+        else if (rawBrowser.includes('Safari')) browser = 'Safari';
+        else if (rawBrowser.includes('Firefox')) browser = 'Firefox';
+        else if (rawBrowser.includes('Edge')) browser = 'Edge';
+        else browser = 'Other';
+
+        const rawOS = osResult.name || '';
+        if (rawOS.includes('Windows')) operatingSystem = 'Windows';
+        else if (rawOS.includes('Mac OS') || rawOS.includes('macOS')) operatingSystem = 'macOS';
+        else if (rawOS.includes('Linux')) operatingSystem = 'Linux';
+        else if (rawOS.includes('Android')) operatingSystem = 'Android';
+        else if (rawOS.includes('iOS')) operatingSystem = 'iOS';
+        else operatingSystem = 'Other';
+
+        const deviceType = deviceResult.type;
+        if (!deviceType) {
+          device = 'Desktop';
+        } else if (deviceType === 'mobile') {
+          device = 'Mobile';
+        } else if (deviceType === 'tablet') {
+          device = 'Tablet';
+        } else {
+          device = 'Unknown';
+        }
+      }
+
+      // 3. Classify Referrer
+      if (clientInfo.referrer) {
+        const ref = clientInfo.referrer.toLowerCase().trim();
+        if (ref !== '') {
+          if (ref.includes('google.com') || ref.includes('google.')) {
+            referrer = 'Google';
+          } else if (ref.includes('linkedin.com')) {
+            referrer = 'LinkedIn';
+          } else if (ref.includes('facebook.com') || ref.includes('fb.me')) {
+            referrer = 'Facebook';
+          } else if (ref.includes('instagram.com')) {
+            referrer = 'Instagram';
+          } else if (ref.includes('twitter.com') || ref.includes('t.co') || ref.includes('x.com')) {
+            referrer = 'X (Twitter)';
+          } else {
+            referrer = 'Other';
+          }
+        }
+      }
+    }
+
+    // Save ClickEvent to database
+    await clickEventRepository.createClickEvent({
+      linkId: link._id,
+      country,
+      countryCode,
+      device,
+      browser,
+      operatingSystem,
+      referrer
+    });
+  } catch (err) {
+    console.error('Failed to log click event analytics:', err);
+    // Ignore error so redirection continues
+  }
 
   return link.originalUrl;
 };

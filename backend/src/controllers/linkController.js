@@ -117,7 +117,14 @@ const updateLinkStatus = async (req, res, next) => {
 const redirectToOriginalUrl = async (req, res, next) => {
   try {
     const shortCode = req.params.shortCode;
-    const originalUrl = await linkService.resolveShortCode(shortCode);
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+               req.headers['x-real-ip'] ||
+               req.ip ||
+               req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'] || '';
+    const referrer = req.headers['referer'] || req.headers['referrer'] || '';
+
+    const originalUrl = await linkService.resolveShortCode(shortCode, { ip, userAgent, referrer });
 
     return res.redirect(302, originalUrl);
   } catch (error) {

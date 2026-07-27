@@ -931,6 +931,39 @@ Shortly supports profile management allowing users to update their profile detai
 
 ---
 
+# 19. Analytics Infrastructure
+
+## Overview
+Shortly tracks click events asynchronously during link redirects to capture usage insights (device, browser, OS, referrer, and approximate country) without delaying the redirection experience or violating user privacy.
+
+## ClickEvent Schema
+- **Collection**: `clickevents`
+- **Fields**:
+  - `linkId`: Reference to `Link` document (indexed, required)
+  - `clickedAt`: Timestamp of the visit (indexed, default `Date.now`)
+  - `country`: Full country name (e.g. `India`, `United States`, or `Unknown`)
+  - `countryCode`: 2-letter country code (e.g. `IN`, `US`, or `Unknown`)
+  - `device`: Device type (normalized: `Desktop`, `Mobile`, `Tablet`, `Unknown`)
+  - `browser`: Browser engine (normalized: `Chrome`, `Safari`, `Firefox`, `Edge`, `Other`)
+  - `operatingSystem`: OS name (normalized: `Windows`, `macOS`, `Linux`, `Android`, `iOS`, `Other`)
+  - `referrer`: Traffic source (normalized: `Direct`, `Google`, `LinkedIn`, `Facebook`, `Instagram`, `X (Twitter)`, `Other`)
+
+## Specifications
+- **Failure Tolerance**: Analytics writing failures (e.g., MongoDB write crash) are caught and ignored, ensuring that visitor redirects always succeed and click counts are incremented.
+- **Privacy Protections**: Raw visitor IP addresses, full User-Agent headers, session cookies, and precise locations are **never** stored.
+- **Header Parsing**: Evaluates reverse proxies via `x-forwarded-for` and `x-real-ip` when `trust proxy` is enabled.
+- **Third-party Packages**: Uses `ua-parser-js` for browser/OS/device checks and `geoip-lite` for Geo-IP classification.
+
+## REST API Details
+- **Route**: `GET /api/links/:id/analytics`
+- **Authentication**: Protected. Requires a valid bearer JWT token in the `Authorization` header.
+- **Access Control**: Strict link ownership validation. If the requester does not own the link, returns `403 Forbidden` (`Access denied. You do not own this link.`). If the link does not exist, returns `404 Not Found`.
+- **Response Format**:
+  - Generates unified response containing `overview`, `trend` datasets, and normalized breakdowns.
+  - Zero-click states return empty arrays `[]` for breakdowns and 0 counts for overview.
+
+---
+
 # End of Part 2
 
 | Feature | Status | Reviewed | Tested |

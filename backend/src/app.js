@@ -10,6 +10,7 @@ const redirectRoutes = require('./routes/redirectRoutes');
 const errorMiddleware = require('./middlewares/errorMiddleware');
 
 const app = express();
+app.set('trust proxy', true);
 
 // Middleware
 app.use(helmet());
